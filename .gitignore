@@ -1,0 +1,19 @@
+# Arquivos de dados (não subir arquivos pessoais/relatórios)
+*.xlsx
+*.csv
+*.xls
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+venv/
+.venv/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Sistema
+.DS_Store
+Thumbs.db
