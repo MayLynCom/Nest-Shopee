@@ -1,3 +1,4 @@
+import io
 import streamlit as st
 import pandas as pd
 from processor import processar_tudo
@@ -14,6 +15,57 @@ def brl(valor: float) -> str:
     """Formata float para o padrão monetário brasileiro: R$ 1.234,56"""
     formatted = f"{valor:,.2f}"
     return "R$ " + formatted.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _gerar_excel(
+    df_filtrado: pd.DataFrame,
+    gmv: float,
+    receita_ads: float,
+    investimento_ads: float,
+    tacos: float,
+) -> bytes:
+    """Gera um arquivo Excel com aba de métricas e aba de produtos."""
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        # Aba 1 — Resumo de métricas
+        resumo = pd.DataFrame({
+            "Métrica": ["GMV (Faturamento Total)", "Receita ADS", "Investimento ADS", "TACOS (%)"],
+            "Valor": [gmv, receita_ads, investimento_ads, round(tacos, 2)],
+        })
+        resumo.to_excel(writer, sheet_name="Resumo", index=False)
+
+        # Aba 2 — Produtos (seleção atual do filtro de curvas)
+        df_export = pd.DataFrame({
+            "ID do Produto": df_filtrado["ID do Produto"].values,
+            "Nome do Produto": df_filtrado["Nome"].values,
+            "Curva": df_filtrado["Curva"].values,
+            "Unidades Vendidas": df_filtrado["Unidades Vendidas"].values,
+            "Ticket Médio (R$)": df_filtrado["Ticket Médio"].round(2).values,
+            "Faturamento Total (R$)": df_filtrado["Faturamento"].round(2).values,
+            "ADS": df_filtrado["ADS"].values,
+        })
+        df_export.to_excel(writer, sheet_name="Produtos", index=False)
+
+        # Aplicar cor laranja nas linhas de produtos em ADS
+        wb = writer.book
+        ws = wb["Produtos"]
+        from openpyxl.styles import PatternFill, Font
+        fill_ads = PatternFill(start_color="FFE0D6", end_color="FFE0D6", fill_type="solid")
+        font_ads = Font(color="BF3A1E", bold=True)
+        for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+            if row[-1].value == "Sim":
+                for cell in row:
+                    cell.fill = fill_ads
+                    cell.font = font_ads
+
+        # Ajustar largura das colunas automaticamente
+        for sheet in wb.sheetnames:
+            ws_cur = wb[sheet]
+            for col in ws_cur.columns:
+                max_len = max((len(str(c.value)) if c.value else 0) for c in col)
+                ws_cur.column_dimensions[col[0].column_letter].width = min(max_len + 4, 60)
+
+    return output.getvalue()
 
 
 # ── CSS com identidade visual Shopee ────────────────────────────────────────
@@ -370,15 +422,26 @@ if "resultado" in st.session_state:
         )
 
         ads_count = int((df_filtrado["ADS"] == "Sim").sum())
-        st.markdown(
-            f'<div style="margin-top:8px; font-size:13px; color:#888;">'
-            f'<span style="background:#FFF0EB; color:#EE4D2D; padding:2px 9px; '
-            f'border-radius:4px; font-weight:700; border:1px solid #FECACA;">laranja</span>'
-            f" = produto em campanha ADS &nbsp;|&nbsp; "
-            f"<b>{ads_count}</b> de <b>{len(df_filtrado)}</b> produtos nesta seleção estão em ADS"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
+        col_legenda, col_download = st.columns([3, 1])
+        with col_legenda:
+            st.markdown(
+                f'<div style="margin-top:8px; font-size:13px; color:#888;">'
+                f'<span style="background:#FFF0EB; color:#EE4D2D; padding:2px 9px; '
+                f'border-radius:4px; font-weight:700; border:1px solid #FECACA;">laranja</span>'
+                f" = produto em campanha ADS &nbsp;|&nbsp; "
+                f"<b>{ads_count}</b> de <b>{len(df_filtrado)}</b> produtos nesta seleção estão em ADS"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+        with col_download:
+            excel_bytes = _gerar_excel(df_filtrado, gmv, receita_ads, investimento_ads, tacos)
+            st.download_button(
+                label="⬇️ Baixar Excel",
+                data=excel_bytes,
+                file_name="shopee_analytics.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
 
 # ── Rodapé ───────────────────────────────────────────────────────────────────
 st.markdown("<br><br>", unsafe_allow_html=True)
