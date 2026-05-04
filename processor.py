@@ -39,11 +39,12 @@ def _classificar_curva(pct_acumulado: float) -> str:
         return "C"
 
 
-def processar_produtos(file) -> pd.DataFrame:
+def processar_produtos(file) -> dict:
     """
     Lê o xlsx de métricas de produtos (aba 'Produtos com Melhor Desempenho').
-    Retorna DataFrame com: ID do Produto, Nome, Faturamento, Unidades Vendidas,
-    Ticket Médio, Curva, % Acumulado.
+    Retorna dict com:
+      - df: DataFrame apenas com produtos ativos (Excluídos removidos)
+      - gmv_bruto: soma de faturamento de TODOS os produtos (incluindo Excluídos)
     """
     df = pd.read_excel(
         file,
@@ -51,16 +52,20 @@ def processar_produtos(file) -> pd.DataFrame:
         engine="openpyxl",
     )
 
-    # Remover produtos excluídos
+    # Calcular GMV bruto ANTES de remover excluídos
+    col_fat = "Vendas (Pedido pago) (BRL)"
+    gmv_bruto = df[col_fat].apply(_parse_brl).sum()
+
+    # Remover produtos excluídos da tabela de análise
     df = df[df["Status Atual do Item"] != "Excluído"].copy()
 
     # Selecionar e renomear colunas relevantes
-    df = df[["ID do Item", "Produto", "Vendas (Pedido pago) (BRL)", "Unidades (Pedido pago)"]].copy()
+    df = df[["ID do Item", "Produto", col_fat, "Unidades (Pedido pago)"]].copy()
     df.rename(
         columns={
             "ID do Item": "ID do Produto",
             "Produto": "Nome",
-            "Vendas (Pedido pago) (BRL)": "Faturamento",
+            col_fat: "Faturamento",
             "Unidades (Pedido pago)": "Unidades Vendidas",
         },
         inplace=True,
@@ -94,7 +99,7 @@ def processar_produtos(file) -> pd.DataFrame:
 
     df["Curva"] = df["% Acumulado"].apply(_classificar_curva)
 
-    return df
+    return {"df": df, "gmv_bruto": gmv_bruto}
 
 
 def processar_ads_principal(file) -> dict:
@@ -183,8 +188,9 @@ def processar_tudo(
       - tacos: float (%)
     """
     # Produtos
-    df = processar_produtos(file_produtos)
-    gmv = df["Faturamento"].sum()
+    resultado_produtos = processar_produtos(file_produtos)
+    df = resultado_produtos["df"]
+    gmv = resultado_produtos["gmv_bruto"]  # inclui produtos Excluídos
 
     # ADS principal
     ads = processar_ads_principal(file_ads)
