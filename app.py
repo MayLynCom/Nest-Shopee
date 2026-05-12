@@ -241,7 +241,7 @@ with col1:
     if file_produtos:
         st.markdown('<span class="file-badge">✔ 1 arquivo carregado</span>', unsafe_allow_html=True)
     else:
-        st.caption("Arquivo xlsx — aba 'Produtos com Melhor Desempenho'")
+        st.caption("Arquivo xlsx — 2ª aba: colunas ID do Item, Produto, Vendas (BRL), Unidades")
 
 with col2:
     st.markdown('<p class="upload-title">📣 Relatório Geral de ADS</p>', unsafe_allow_html=True)

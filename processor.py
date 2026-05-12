@@ -41,32 +41,30 @@ def _classificar_curva(pct_acumulado: float) -> str:
 
 def processar_produtos(file) -> dict:
     """
-    Lê o xlsx de métricas de produtos (aba 'Produtos com Melhor Desempenho').
+    Lê o xlsx de métricas de produtos (2ª aba, índice 1).
+    Colunas esperadas: ID do Item, Produto, Vendas (BRL), Unidades.
     Retorna dict com:
-      - df: DataFrame apenas com produtos ativos (Excluídos removidos)
-      - gmv_bruto: soma de faturamento de TODOS os produtos (incluindo Excluídos)
+      - df: DataFrame processado (curva ABC, ticket médio)
+      - gmv_bruto: soma de Vendas (BRL) de todas as linhas da aba
     """
     df = pd.read_excel(
         file,
-        sheet_name="Produtos com Melhor Desempenho",
+        sheet_name=1,
         engine="openpyxl",
     )
+    df.columns = df.columns.str.strip()
 
-    # Calcular GMV bruto ANTES de remover excluídos
-    col_fat = "Vendas (Pedido pago) (BRL)"
+    col_fat = "Vendas (BRL)"
+    col_unid = "Unidades"
     gmv_bruto = df[col_fat].apply(_parse_brl).sum()
 
-    # Remover produtos excluídos da tabela de análise
-    df = df[df["Status Atual do Item"] != "Excluído"].copy()
-
-    # Selecionar e renomear colunas relevantes
-    df = df[["ID do Item", "Produto", col_fat, "Unidades (Pedido pago)"]].copy()
+    df = df[["ID do Item", "Produto", col_fat, col_unid]].copy()
     df.rename(
         columns={
             "ID do Item": "ID do Produto",
             "Produto": "Nome",
             col_fat: "Faturamento",
-            "Unidades (Pedido pago)": "Unidades Vendidas",
+            col_unid: "Unidades Vendidas",
         },
         inplace=True,
     )
@@ -105,10 +103,12 @@ def processar_produtos(file) -> dict:
 def processar_ads_principal(file) -> dict:
     """
     Lê o CSV principal de anúncios Shopee (skiprows=6).
+    Soma GMV e Despesas sobre todas as linhas (receita e investimento ADS).
+    Os IDs marcados como em ADS vêm apenas das linhas com Status «Em Andamento».
     Retorna dict com:
       - receita_ads: float
       - investimento_ads: float
-      - ids_em_ads: set de strings com IDs de produtos em ADS
+      - ids_em_ads: set de strings com IDs de produtos em ADS em andamento
     """
     content = file.read()
     df = pd.read_csv(
@@ -121,10 +121,6 @@ def processar_ads_principal(file) -> dict:
     # Normalizar nomes de colunas (remover espaços extras)
     df.columns = df.columns.str.strip()
 
-    # Filtrar apenas anúncios em andamento
-    if "Status" in df.columns:
-        df = df[df["Status"].str.strip() == "Em Andamento"].copy()
-
     # Converter GMV e Despesas para float (CSV já usa ponto como decimal)
     df["GMV"] = pd.to_numeric(df["GMV"], errors="coerce").fillna(0.0)
     df["Despesas"] = pd.to_numeric(df["Despesas"], errors="coerce").fillna(0.0)
@@ -132,12 +128,20 @@ def processar_ads_principal(file) -> dict:
     receita_ads = df["GMV"].sum()
     investimento_ads = df["Despesas"].sum()
 
-    # IDs de produtos em ADS (excluir linhas de grupo marcadas com "-")
-    ids_coluna = "ID do produto" if "ID do produto" in df.columns else None
+    # IDs só de anúncios em andamento (após já ter totals do arquivo inteiro)
+    if "Status" in df.columns:
+        df_para_ids = df[df["Status"].str.strip() == "Em Andamento"].copy()
+    else:
+        df_para_ids = df
+
+    ids_coluna = "ID do produto" if "ID do produto" in df_para_ids.columns else None
     ids_em_ads: set = set()
     if ids_coluna:
         ids_em_ads = set(
-            df[df[ids_coluna].str.strip() != "-"][ids_coluna].str.strip().tolist()
+            df_para_ids[df_para_ids[ids_coluna].str.strip() != "-"][
+                ids_coluna
+            ].str.strip()
+            .tolist()
         )
 
     return {
@@ -190,7 +194,7 @@ def processar_tudo(
     # Produtos
     resultado_produtos = processar_produtos(file_produtos)
     df = resultado_produtos["df"]
-    gmv = resultado_produtos["gmv_bruto"]  # inclui produtos Excluídos
+    gmv = resultado_produtos["gmv_bruto"]
 
     # ADS principal
     ads = processar_ads_principal(file_ads)
