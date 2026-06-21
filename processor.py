@@ -39,24 +39,46 @@ def _classificar_curva(pct_acumulado: float) -> str:
         return "C"
 
 
+def _detectar_skiprows(content: bytes, coluna_referencia: str = "GMV") -> int:
+    """
+    Detecta automaticamente quantas linhas pular para encontrar o cabeçalho
+    que contém a coluna de referência. Tenta utf-8-sig e latin-1, separadores ; e ,
+    """
+    for encoding in ("utf-8-sig", "latin-1"):
+        try:
+            texto = content.decode(encoding)
+            for i, linha in enumerate(texto.splitlines()):
+                for sep in (";", ","):
+                    partes = [p.strip().strip('"') for p in linha.split(sep)]
+                    if coluna_referencia in partes:
+                        return i
+        except Exception:
+            continue
+    return 0
+
+
 def processar_produtos(file) -> dict:
     """
-    Lê o xlsx de métricas de produtos (2ª aba, índice 1).
-    Colunas esperadas: ID do Item, Produto, Vendas (BRL), Unidades.
+    Lê o xlsx parentskudetail, aba 'Produtos com Melhor Desempenho'.
+    Colunas esperadas: ID do Item, Produto, Vendas (Pedido pago) (BRL), Unidades (Pedido pago).
+    Se a coluna 'ID da Variação' existir, mantém apenas linhas onde ela é diferente de '-'.
     Retorna dict com:
       - df: DataFrame processado (curva ABC, ticket médio)
-      - gmv_bruto: soma de Vendas (BRL) de todas as linhas da aba
+      - gmv_bruto: soma de Vendas (Pedido pago) (BRL) de todas as linhas da aba
     """
     df = pd.read_excel(
         file,
-        sheet_name=1,
+        sheet_name="Produtos com Melhor Desempenho",
         engine="openpyxl",
     )
     df.columns = df.columns.str.strip()
 
-    col_fat = "Vendas (BRL)"
-    col_unid = "Unidades"
-    gmv_bruto = df[col_fat].apply(_parse_brl).sum()
+    if "ID da Variação" in df.columns:
+        df = df[df["ID da Variação"].astype(str).str.strip() == "-"].copy()
+
+    col_fat = "Vendas (Pedido pago) (BRL)"
+    col_unid = "Unidades (Pedido pago)"
+    gmv_bruto = pd.to_numeric(df[col_fat].apply(_parse_brl), errors="coerce").fillna(0.0).sum()
 
     df = df[["ID do Item", "Produto", col_fat, col_unid]].copy()
     df.rename(
@@ -69,9 +91,13 @@ def processar_produtos(file) -> dict:
         inplace=True,
     )
 
-    # Converter valores
-    df["Faturamento"] = df["Faturamento"].apply(_parse_brl)
-    df["Unidades Vendidas"] = df["Unidades Vendidas"].apply(_parse_numero).astype(int)
+    # Converter valores — cast explícito para float/int para evitar object dtype
+    df["Faturamento"] = pd.to_numeric(
+        df["Faturamento"].apply(_parse_brl), errors="coerce"
+    ).fillna(0.0)
+    df["Unidades Vendidas"] = pd.to_numeric(
+        df["Unidades Vendidas"].apply(_parse_numero), errors="coerce"
+    ).fillna(0).astype(int)
     df["ID do Produto"] = df["ID do Produto"].astype(str).str.strip()
 
     # Agrupar por ID (caso haja variações duplicadas do mesmo produto)
@@ -102,7 +128,8 @@ def processar_produtos(file) -> dict:
 
 def processar_ads_principal(file) -> dict:
     """
-    Lê o CSV principal de anúncios Shopee (skiprows=6).
+    Lê o CSV principal de anúncios Shopee.
+    Detecta automaticamente a linha do cabeçalho procurando pela coluna 'GMV'.
     Soma GMV e Despesas sobre todas as linhas (receita e investimento ADS).
     Os IDs marcados como em ADS vêm apenas das linhas com Status «Em Andamento».
     Retorna dict com:
@@ -111,15 +138,27 @@ def processar_ads_principal(file) -> dict:
       - ids_em_ads: set de strings com IDs de produtos em ADS em andamento
     """
     content = file.read()
+    skiprows = _detectar_skiprows(content, "GMV")
+
     df = pd.read_csv(
         io.BytesIO(content),
-        skiprows=6,
+        skiprows=skiprows,
+        sep=";",
         encoding="utf-8-sig",
         dtype=str,
     )
 
     # Normalizar nomes de colunas (remover espaços extras)
     df.columns = df.columns.str.strip()
+
+    if "GMV" not in df.columns:
+        raise KeyError(
+            f"Coluna 'GMV' não encontrada. Colunas disponíveis: {df.columns.tolist()}"
+        )
+    if "Despesas" not in df.columns:
+        raise KeyError(
+            f"Coluna 'Despesas' não encontrada. Colunas disponíveis: {df.columns.tolist()}"
+        )
 
     # Converter GMV e Despesas para float (CSV já usa ponto como decimal)
     df["GMV"] = pd.to_numeric(df["GMV"], errors="coerce").fillna(0.0)
@@ -160,9 +199,11 @@ def processar_grupos_ads(files: list) -> set:
     for file in files:
         content = file.read()
         try:
+            skiprows = _detectar_skiprows(content, "GMV")
             df = pd.read_csv(
                 io.BytesIO(content),
-                skiprows=6,
+                skiprows=skiprows,
+                sep=";",
                 encoding="utf-8-sig",
                 dtype=str,
             )

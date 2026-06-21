@@ -206,6 +206,39 @@ st.markdown(
     .stMultiSelect [data-baseweb="tag"] {
         background-color: var(--shopee-orange) !important;
     }
+
+    /* ── Contraste universal: texto sempre legível ────────────────────────── */
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
+        background-color: #F5F5F5 !important;
+        color: #333333 !important;
+    }
+    [data-testid="stSidebar"], section[data-testid="stSidebar"] > div {
+        background-color: #FFFFFF !important;
+        color: #333333 !important;
+    }
+    .stMarkdown p, .stMarkdown span, .stMarkdown li,
+    [data-testid="stMarkdownContainer"] p,
+    [data-testid="stMarkdownContainer"] span,
+    [data-testid="stText"],
+    .stCaption, label, .stRadio label, .stCheckbox label,
+    .stSelectbox label, .stMultiSelect label, .stSlider label,
+    .stNumberInput label, .stTextInput label, .stTextArea label {
+        color: #333333 !important;
+    }
+    .stCaption, [data-testid="stCaptionContainer"] {
+        color: #666666 !important;
+    }
+    [data-baseweb="input"] input,
+    [data-baseweb="textarea"] textarea,
+    [data-baseweb="select"] div {
+        color: #333333 !important;
+        background-color: #FFFFFF !important;
+    }
+    [data-testid="stAlert"] p,
+    [data-testid="stAlert"] span {
+        color: #333333 !important;
+    }
+    [data-testid="stSpinner"] p { color: #333333 !important; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -241,7 +274,7 @@ with col1:
     if file_produtos:
         st.markdown('<span class="file-badge">✔ 1 arquivo carregado</span>', unsafe_allow_html=True)
     else:
-        st.caption("Arquivo xlsx — 2ª aba: colunas ID do Item, Produto, Vendas (BRL), Unidades")
+        st.caption("Arquivo xlsx parentskudetail — aba 'Produtos com Melhor Desempenho': ID do Item, Produto, Vendas (Pedido pago) (BRL), Unidades (Pedido pago)")
 
 with col2:
     st.markdown('<p class="upload-title">📣 Relatório Geral de ADS</p>', unsafe_allow_html=True)
