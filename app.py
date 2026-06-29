@@ -43,6 +43,8 @@ def _gerar_excel(
             "Ticket Médio (R$)": df_filtrado["Ticket Médio"].round(2).values,
             "Faturamento Total (R$)": df_filtrado["Faturamento"].round(2).values,
             "ADS": df_filtrado["ADS"].values,
+            "Gasto ADS (R$)": df_filtrado["Gasto ADS"].round(2).values,
+            "TACOS Produto (%)": df_filtrado["TACOS Produto"].round(2).values,
         })
         df_export.to_excel(writer, sheet_name="Produtos", index=False)
 
@@ -52,8 +54,9 @@ def _gerar_excel(
         from openpyxl.styles import PatternFill, Font
         fill_ads = PatternFill(start_color="FFE0D6", end_color="FFE0D6", fill_type="solid")
         font_ads = Font(color="BF3A1E", bold=True)
+        col_ads_idx = df_export.columns.tolist().index("ADS")
         for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
-            if row[-1].value == "Sim":
+            if row[col_ads_idx].value == "Sim":
                 for cell in row:
                     cell.fill = fill_ads
                     cell.font = font_ads
@@ -422,6 +425,8 @@ if "resultado" in st.session_state:
             "Ticket Médio": df_filtrado["Ticket Médio"].round(2).values,
             "Faturamento Total": df_filtrado["Faturamento"].round(2).values,
             "ADS": df_filtrado["ADS"].values,
+            "Gasto ADS": df_filtrado["Gasto ADS"].round(2).values,
+            "TACOS Produto": df_filtrado["TACOS Produto"].round(2).values,
         })
 
         def estilizar_linha(row):
@@ -435,6 +440,8 @@ if "resultado" in st.session_state:
             .format({
                 "Ticket Médio": lambda x: brl(x) if isinstance(x, (int, float)) else x,
                 "Faturamento Total": lambda x: brl(x) if isinstance(x, (int, float)) else x,
+                "Gasto ADS": lambda x: brl(x) if isinstance(x, (int, float)) else x,
+                "TACOS Produto": lambda x: f"{x:.2f}%" if isinstance(x, (int, float)) else x,
             })
         )
 
@@ -450,6 +457,8 @@ if "resultado" in st.session_state:
                 "Ticket Médio": st.column_config.TextColumn("Ticket Médio", width=130),
                 "Faturamento Total": st.column_config.TextColumn("Faturamento Total", width=145),
                 "ADS": st.column_config.TextColumn("ADS", width=60),
+                "Gasto ADS": st.column_config.TextColumn("Gasto ADS", width=130),
+                "TACOS Produto": st.column_config.TextColumn("TACOS Produto", width=120),
             },
             hide_index=True,
         )

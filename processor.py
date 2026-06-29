@@ -136,6 +136,7 @@ def processar_ads_principal(file) -> dict:
       - receita_ads: float
       - investimento_ads: float
       - ids_em_ads: set de strings com IDs de produtos em ADS em andamento
+      - despesas_por_produto: dict {id_produto: total_despesas}
     """
     content = file.read()
     skiprows = _detectar_skiprows(content, "GMV")
@@ -175,18 +176,22 @@ def processar_ads_principal(file) -> dict:
 
     ids_coluna = "ID do produto" if "ID do produto" in df_para_ids.columns else None
     ids_em_ads: set = set()
+    despesas_por_produto: dict = {}
+
     if ids_coluna:
-        ids_em_ads = set(
-            df_para_ids[df_para_ids[ids_coluna].str.strip() != "-"][
-                ids_coluna
-            ].str.strip()
-            .tolist()
-        )
+        df_validos = df_para_ids[df_para_ids[ids_coluna].str.strip() != "-"].copy()
+        df_validos["_id"] = df_validos[ids_coluna].str.strip()
+        ids_em_ads = set(df_validos["_id"].tolist())
+
+        # Agrupa despesas por produto
+        agrupado = df_validos.groupby("_id")["Despesas"].sum()
+        despesas_por_produto = agrupado.to_dict()
 
     return {
         "receita_ads": receita_ads,
         "investimento_ads": investimento_ads,
         "ids_em_ads": ids_em_ads,
+        "despesas_por_produto": despesas_por_produto,
     }
 
 
@@ -242,6 +247,7 @@ def processar_tudo(
     receita_ads = ads["receita_ads"]
     investimento_ads = ads["investimento_ads"]
     ids_em_ads = ads["ids_em_ads"]
+    despesas_por_produto = ads["despesas_por_produto"]
 
     # Grupos opcionais
     if files_grupos:
@@ -251,7 +257,16 @@ def processar_tudo(
     # Marcar ADS no DataFrame de produtos
     df["ADS"] = df["ID do Produto"].apply(lambda x: "Sim" if x in ids_em_ads else "Não")
 
-    # TACOS
+    # Gasto ADS por produto e TACOS por produto
+    df["Gasto ADS"] = df["ID do Produto"].apply(
+        lambda x: despesas_por_produto.get(x, 0.0)
+    )
+    df["TACOS Produto"] = df.apply(
+        lambda r: (r["Gasto ADS"] / r["Faturamento"] * 100) if r["Faturamento"] > 0 else 0.0,
+        axis=1,
+    )
+
+    # TACOS global
     tacos = (investimento_ads / gmv * 100) if gmv > 0 else 0.0
 
     return {
