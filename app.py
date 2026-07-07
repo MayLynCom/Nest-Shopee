@@ -277,8 +277,6 @@ with col1:
     st.caption("Na Shopee: Informações gerenciais -> Produto -> Performance Produto -> Exportar Dados")
     if file_produtos:
         st.markdown('<span class="file-badge">✔ 1 arquivo carregado</span>', unsafe_allow_html=True)
-    else:
-        st.caption("Arquivo xlsx parentskudetail — aba 'Produtos com Melhor Desempenho': ID do Item, Produto, Vendas (Pedido pago) (BRL), Unidades (Pedido pago)")
 
 with col2:
     st.markdown('<p class="upload-title">📣 Relatório Geral de ADS (opcional)</p>', unsafe_allow_html=True)
@@ -291,8 +289,6 @@ with col2:
     st.caption("Na Shopee: Shopee ADS -> Exportar Dados")
     if file_ads:
         st.markdown('<span class="file-badge">✔ 1 arquivo carregado</span>', unsafe_allow_html=True)
-    else:
-        st.caption("CSV opcional — Dados Gerais de Anúncios Shopee")
 
 with col3:
     st.markdown('<p class="upload-title">📁 Grupos de ADS (opcional)</p>', unsafe_allow_html=True)
@@ -310,8 +306,6 @@ with col3:
             f'<span class="file-badge">✔ {qtd} arquivo{"s" if qtd > 1 else ""} carregado{"s" if qtd > 1 else ""}</span>',
             unsafe_allow_html=True,
         )
-    else:
-        st.caption("Envie 1 ou mais CSVs de grupos de anúncios (sem limite)")
 
 # ── Botão processar ──────────────────────────────────────────────────────────
 st.markdown("<br>", unsafe_allow_html=True)
