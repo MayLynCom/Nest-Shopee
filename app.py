@@ -254,7 +254,7 @@ st.markdown(
         <div class="shopee-logo">🛒</div>
         <div>
             <h1>Shopee Analytics</h1>
-            <p>Análise de desempenho de produtos e campanhas ADS</p>
+            <p>Análise de desempenho de produtos e campanhas ADS opcionais</p>
         </div>
     </div>
     """,
@@ -274,23 +274,25 @@ with col1:
         key="file_produtos",
         label_visibility="collapsed",
     )
+    st.caption("Na Shopee: Informações gerenciais -> Produto -> Performance Produto -> Exportar Dados")
     if file_produtos:
         st.markdown('<span class="file-badge">✔ 1 arquivo carregado</span>', unsafe_allow_html=True)
     else:
         st.caption("Arquivo xlsx parentskudetail — aba 'Produtos com Melhor Desempenho': ID do Item, Produto, Vendas (Pedido pago) (BRL), Unidades (Pedido pago)")
 
 with col2:
-    st.markdown('<p class="upload-title">📣 Relatório Geral de ADS</p>', unsafe_allow_html=True)
+    st.markdown('<p class="upload-title">📣 Relatório Geral de ADS (opcional)</p>', unsafe_allow_html=True)
     file_ads = st.file_uploader(
         "CSV Dados Gerais de Anúncios Shopee",
         type=["csv"],
         key="file_ads",
         label_visibility="collapsed",
     )
+    st.caption("Na Shopee: Shopee ADS -> Exportar Dados")
     if file_ads:
         st.markdown('<span class="file-badge">✔ 1 arquivo carregado</span>', unsafe_allow_html=True)
     else:
-        st.caption("CSV — Dados Gerais de Anúncios Shopee")
+        st.caption("CSV opcional — Dados Gerais de Anúncios Shopee")
 
 with col3:
     st.markdown('<p class="upload-title">📁 Grupos de ADS (opcional)</p>', unsafe_allow_html=True)
@@ -301,6 +303,7 @@ with col3:
         accept_multiple_files=True,
         label_visibility="collapsed",
     )
+    st.caption("Na Shopee: Shopee ADS -> abrir o grupo -> Exportar Dados")
     if files_grupos:
         qtd = len(files_grupos)
         st.markdown(
@@ -318,9 +321,9 @@ with col_btn:
 
 # ── Ao clicar em Processar: rodar e salvar no session_state ─────────────────
 if processar:
-    if not file_produtos or not file_ads:
+    if not file_produtos:
         st.warning(
-            "⚠️ Envie os dois arquivos obrigatórios: **Relatório de Produtos** e **Relatório de ADS**."
+            "⚠️ Envie o arquivo obrigatório: **Relatório de Produtos**."
         )
         st.stop()
 

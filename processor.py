@@ -57,6 +57,30 @@ def _detectar_skiprows(content: bytes, coluna_referencia: str = "GMV") -> int:
     return 0
 
 
+def _ler_csv_shopee(content: bytes, skiprows: int) -> pd.DataFrame:
+    """Lê CSVs da Shopee detectando automaticamente vírgula ou ponto e vírgula."""
+    for encoding in ("utf-8-sig", "latin-1"):
+        try:
+            return pd.read_csv(
+                io.BytesIO(content),
+                skiprows=skiprows,
+                sep=None,
+                engine="python",
+                encoding=encoding,
+                dtype=str,
+            )
+        except UnicodeDecodeError:
+            continue
+    return pd.read_csv(
+        io.BytesIO(content),
+        skiprows=skiprows,
+        sep=None,
+        engine="python",
+        encoding="utf-8-sig",
+        dtype=str,
+    )
+
+
 def processar_produtos(file) -> dict:
     """
     Lê o xlsx parentskudetail, aba 'Produtos com Melhor Desempenho'.
@@ -141,13 +165,7 @@ def processar_ads_principal(file) -> dict:
     content = file.read()
     skiprows = _detectar_skiprows(content, "GMV")
 
-    df = pd.read_csv(
-        io.BytesIO(content),
-        skiprows=skiprows,
-        sep=";",
-        encoding="utf-8-sig",
-        dtype=str,
-    )
+    df = _ler_csv_shopee(content, skiprows)
 
     # Normalizar nomes de colunas (remover espaços extras)
     df.columns = df.columns.str.strip()
@@ -205,13 +223,7 @@ def processar_grupos_ads(files: list) -> set:
         content = file.read()
         try:
             skiprows = _detectar_skiprows(content, "GMV")
-            df = pd.read_csv(
-                io.BytesIO(content),
-                skiprows=skiprows,
-                sep=";",
-                encoding="utf-8-sig",
-                dtype=str,
-            )
+            df = _ler_csv_shopee(content, skiprows)
             df.columns = df.columns.str.strip()
 
             ids_coluna = "ID do produto" if "ID do produto" in df.columns else None
@@ -226,7 +238,7 @@ def processar_grupos_ads(files: list) -> set:
 
 def processar_tudo(
     file_produtos,
-    file_ads,
+    file_ads=None,
     files_grupos: list | None = None,
 ) -> dict:
     """
@@ -242,12 +254,17 @@ def processar_tudo(
     df = resultado_produtos["df"]
     gmv = resultado_produtos["gmv_bruto"]
 
-    # ADS principal
-    ads = processar_ads_principal(file_ads)
-    receita_ads = ads["receita_ads"]
-    investimento_ads = ads["investimento_ads"]
-    ids_em_ads = ads["ids_em_ads"]
-    despesas_por_produto = ads["despesas_por_produto"]
+    # ADS principal opcional
+    receita_ads = 0.0
+    investimento_ads = 0.0
+    ids_em_ads: set = set()
+    despesas_por_produto: dict = {}
+    if file_ads:
+        ads = processar_ads_principal(file_ads)
+        receita_ads = ads["receita_ads"]
+        investimento_ads = ads["investimento_ads"]
+        ids_em_ads = ads["ids_em_ads"]
+        despesas_por_produto = ads["despesas_por_produto"]
 
     # Grupos opcionais
     if files_grupos:
