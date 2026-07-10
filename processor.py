@@ -213,12 +213,14 @@ def processar_ads_principal(file) -> dict:
     }
 
 
-def processar_grupos_ads(files: list) -> set:
+def processar_grupos_ads(files: list) -> dict:
     """
-    Lê um ou mais CSVs de grupo de anúncios e retorna o set de IDs de produtos
-    encontrados (excluindo grupos marcados com '-').
+    Lê um ou mais CSVs de grupo de anúncios e retorna dict com:
+      - ids: set de IDs de produtos encontrados (excluindo linhas de grupo com '-')
+      - despesas_por_produto: dict {id: float} com soma de Despesas por produto
     """
     ids_grupos: set = set()
+    despesas_grupos: dict = {}
     for file in files:
         content = file.read()
         try:
@@ -228,12 +230,22 @@ def processar_grupos_ads(files: list) -> set:
 
             ids_coluna = "ID do produto" if "ID do produto" in df.columns else None
             if ids_coluna:
-                ids_validos = df[df[ids_coluna].str.strip() != "-"][ids_coluna].str.strip()
+                df_produtos = df[df[ids_coluna].str.strip() != "-"].copy()
+                ids_validos = df_produtos[ids_coluna].str.strip()
                 ids_grupos.update(ids_validos.tolist())
+
+                if "Despesas" in df.columns:
+                    df_produtos["_id"] = ids_validos.values
+                    df_produtos["_despesa"] = pd.to_numeric(
+                        df_produtos["Despesas"], errors="coerce"
+                    ).fillna(0.0)
+                    for _, row in df_produtos[["_id", "_despesa"]].iterrows():
+                        pid = row["_id"]
+                        despesas_grupos[pid] = despesas_grupos.get(pid, 0.0) + row["_despesa"]
         except Exception:
             continue
 
-    return ids_grupos
+    return {"ids": ids_grupos, "despesas_por_produto": despesas_grupos}
 
 
 def processar_tudo(
@@ -268,8 +280,10 @@ def processar_tudo(
 
     # Grupos opcionais
     if files_grupos:
-        ids_grupos = processar_grupos_ads(files_grupos)
-        ids_em_ads = ids_em_ads | ids_grupos
+        resultado_grupos = processar_grupos_ads(files_grupos)
+        ids_em_ads = ids_em_ads | resultado_grupos["ids"]
+        for pid, gasto in resultado_grupos["despesas_por_produto"].items():
+            despesas_por_produto[pid] = despesas_por_produto.get(pid, 0.0) + gasto
 
     # Marcar ADS no DataFrame de produtos
     df["ADS"] = df["ID do Produto"].apply(lambda x: "Sim" if x in ids_em_ads else "Não")
